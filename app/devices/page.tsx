@@ -6,6 +6,8 @@ import { useDeviceStore } from "@/lib/store";
 import { connectWebSocket, disconnectWebSocket, makeBatcher } from "@/lib/ws";
 import { rebootDevice } from "@/app/actions";
 
+
+
 const DevicesPage = () => {
   const devices = useDeviceStore(s => s.devices);
   // console.log("🚀 ~ DevicesPage ~ devices:", devices)
@@ -18,10 +20,13 @@ const DevicesPage = () => {
   const [isPending, startTransition] = useTransition();
   const [wsStatus, setWsStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
   const [debugInfo, setDebugInfo] = useState<string>('');
-  const batcher = useMemo(() => makeBatcher(upsertDevice, 500), [upsertDevice]);
   const tableRef = useRef<HTMLDivElement>(null);
   const activeIdempotencyKeys = useRef<Record<string, string>>({});
   const rebootTimeouts = useRef<Record<string, NodeJS.Timeout>>({});
+
+  const batcher = useMemo(() => makeBatcher((items: any[]) => {
+    items.forEach(item => upsertDevice(item));
+  }, 500), [upsertDevice]);
 
   const getOrCreateIdempotencyKey = useCallback((deviceId: string): string => {
     if (!activeIdempotencyKeys.current[deviceId]) {
@@ -71,20 +76,25 @@ const DevicesPage = () => {
 
   const [localFilter, setLocalFilter] = useState(filter);
   useEffect(() => setLocalFilter(filter), [filter]);
-  useEffect(() => { const t = setTimeout(() => setFilter(localFilter), 150); return () => clearTimeout(t); }, [localFilter, setFilter]);
+  useEffect(() => {
+    const timeOut = setTimeout(() => {
+      setFilter(localFilter);
+    }, 150);
+    return () => clearTimeout(timeOut);
+  }, [localFilter, setFilter]);
 
   const list = useMemo(() => {
     // First, ensure we have valid devices
-    const validDevices = (devices ?? []).filter(d =>
-      d && d.id && typeof d.id === 'string' && d.id.trim() !== ''
+    const validDevices = (devices ?? []).filter(device =>
+      device && device.id && typeof device.id === 'string' && device.id.trim() !== ''
     );
 
     const cleanedFilter = (filter ?? '').toString().trim().toLowerCase();
     if (!cleanedFilter) return validDevices;
 
-    const filteredDevices = validDevices.filter(d => {
-      const id = (d?.id ?? '').toString().toLowerCase();
-      const status = (d?.status ?? '').toString().toLowerCase();
+    const filteredDevices = validDevices.filter(device => {
+      const id = (device?.id ?? '').toString().toLowerCase();
+      const status = (device?.status ?? '').toString().toLowerCase();
       return id.includes(cleanedFilter) || status.includes(cleanedFilter);
     });
 
@@ -97,6 +107,8 @@ const DevicesPage = () => {
     if (inFlight[id]) return;
 
     // console.log(`Starting reboot for device ${id}`);
+
+    // guarding against duplicate requests
     const idempotencyKey = getOrCreateIdempotencyKey(id);
     console.log(`Using idempotency key: ${idempotencyKey.substring(0, 8)}...`);
 
@@ -126,6 +138,7 @@ const DevicesPage = () => {
           clearDeviceRebootState(id);
         } else {
           console.log(`Reboot failed for device ${id}:`, res.reason);
+          // rollback if there is a failure
           upsertDevice({ deviceId: id, status: prevStatus === "rebooting" ? "rebooting" : prevStatus === "online" ? "online" : "offline", ts: Date.now() });
           
           if (res.reason === 'not_found' || res.reason === 'invalid_id') {
@@ -185,7 +198,7 @@ const DevicesPage = () => {
           <TableVirtuoso
             data={list}
             totalCount={list.length}
-            className="!h-[100vh]"
+            className="!h-[80vh]"
             components={{
               Table: (props) => <table {...props} className="min-w-full divide-y divide-gray-200" />,
               TableHead: (props) => <thead {...props} className="bg-gray-50" />,
