@@ -23,7 +23,7 @@ type Handlers = {
   onTelemetry: (t: { deviceId: string; status?: string; metrics?: { cpu?: number; ram?: number }; ts?: number; seq?: number }) => void; 
 };
 
-export function connectWebSocket(handlers: Handlers) {
+export const connectWebSocket = (handlers: Handlers) => {
   shouldReconnect = true; 
   const url = `ws://localhost:4001`;
   
@@ -43,14 +43,14 @@ export function connectWebSocket(handlers: Handlers) {
               status: (d.status as any) ?? "online", 
               cpu: typeof d.cpu === 'number' ? d.cpu : undefined, 
               ram: typeof d.ram === 'number' ? d.ram : undefined, 
-              ts: d.ts ?? Date.now() 
+              ts: d.ts ?? Date.now(),
+              lastSeq: 0
             }));
           
           console.log('WebSocket: Seed data cleaned, original:', msg.devices.length, 'clean:', cleanDevices.length);
           handlers.onSeed(cleanDevices);
         }
         else if (msg.type === "telemetry") {
-          // Validate telemetry data
           if (msg.deviceId && typeof msg.deviceId === 'string' && msg.deviceId.trim() !== '') {
             handlers.onTelemetry({ 
               deviceId: msg.deviceId, 
@@ -81,16 +81,16 @@ export function connectWebSocket(handlers: Handlers) {
   
   open(); 
   return () => { disconnectWebSocket(); };
-}
+};
 
-export function disconnectWebSocket(){
+export const disconnectWebSocket = () => {
   shouldReconnect = false; 
   if (reconnectTimer) clearTimeout(reconnectTimer); 
   if (socket && socket.readyState === WebSocket.OPEN) try{ socket.close(); } catch {} 
   socket = null; 
-}
+};
 
-export function makeBatcher<T>(flush: (items: T[]) => void, windowMs = 50){
+export const makeBatcher = <T>(flush: (items: T[]) => void, windowMs = 50) => {
   let buf: T[] = []; 
   let timer: any = null; 
   return (item: T) => { 
