@@ -1,0 +1,228 @@
+%PDF-1.4
+%ÿÿÿÿ
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Count 2 /Kids [ 6 0 R 7 0 R ] >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Length 2027 >>
+stream
+BT
+/F1 11 Tf
+72 720 Td
+14 TL
+() Tj
+T*
+(FrontEnd Assessment - Candidate Instructions) Tj
+T*
+(===========================================) Tj
+T*
+() Tj
+T*
+(Objective) Tj
+T*
+(---------) Tj
+T*
+(Build a small, production-style slice of a real-time dashboard:) Tj
+T*
+(- Virtualized device table with filtering) Tj
+T*
+(- Details page with a small live CPU chart \(30s window\)) Tj
+T*
+(- Reboot control with optimistic UI and idempotency) Tj
+T*
+(- Basic resilience under streaming load) Tj
+T*
+() Tj
+T*
+(Stack) Tj
+T*
+(-----) Tj
+T*
+(Pre-wired: Next.js \(App Router\), React 19, TypeScript, Tailwind, Zustand,) Tj
+T*
+(react-virtuoso, Vitest.) Tj
+T*
+() Tj
+T*
+(Setup) Tj
+T*
+(-----) Tj
+T*
+(1\) Requirements: Node 20 \(nvm use 20\)) Tj
+T*
+(2\) Install: npm i) Tj
+T*
+(3\) Start simulator \(WebSocket + control API\): npm run sim) Tj
+T*
+(   - WebSocket: ws://localhost:4001) Tj
+T*
+(   - Control API: POST http://localhost:4002/control/reboot) Tj
+T*
+(4\) Start app: npm run dev  -> open http://localhost:3000/devices) Tj
+T*
+(5\) Run tests: npm test) Tj
+T*
+() Tj
+T*
+(Build This) Tj
+T*
+(----------) Tj
+T*
+(1\) Devices table \(/devices\)) Tj
+T*
+(   - Virtualized list: ID, status, CPU%, RAM%, last seen, Reboot) Tj
+T*
+(   - Filter by ID or status \(basic debounce is fine\)) Tj
+T*
+(   - Keyboard reachable. Visible focus. Correct table semantics) Tj
+T*
+() Tj
+T*
+(2\) Details page \(/devices/[id]\)) Tj
+T*
+(   - 30 second rolling CPU line chart \(SVG is fine; throttle to about 5-10 fps\)) Tj
+T*
+(   - Show latest CPU, RAM, status, and timestamp) Tj
+T*
+() Tj
+T*
+(3\) Reboot action) Tj
+T*
+(   - Implement using a Next.js Server Action \(stub provided\)) Tj
+T*
+(   - Optimistic update: set status to "rebooting" immediately) Tj
+T*
+(   - Rollback on server error \(the simulator may NACK\)) Tj
+T*
+(   - Include an idempotency key to guard against double submit) Tj
+T*
+() Tj
+T*
+(4\) Resilience and performance) Tj
+T*
+(   - Auto-reconnect WebSocket with backoff \(already scaffolded\)) Tj
+T*
+(   - Batch incoming telemetry to keep typing responsive) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Length 1845 >>
+stream
+BT
+/F1 11 Tf
+72 720 Td
+14 TL
+(   - Tolerate duplicates and out-of-order events \(simulator includes "seq"\)) Tj
+T*
+() Tj
+T*
+(Acceptance Criteria) Tj
+T*
+(-------------------) Tj
+T*
+(- Correctness:) Tj
+T*
+(  * Optimistic reboot applies immediately and rolls back on NACK) Tj
+T*
+(  * Auto-reconnect restores streaming without a manual refresh) Tj
+T*
+(  * No obvious regressions from duplicate or out-of-order telemetry) Tj
+T*
+() Tj
+T*
+(- Performance:) Tj
+T*
+(  * Filtering remains responsive while telemetry streams) Tj
+T*
+(  * Chart updates are throttled \(10 fps or less\) and do not block input) Tj
+T*
+() Tj
+T*
+(- Accessibility:) Tj
+T*
+(  * Table uses appropriate semantics and is keyboard reachable) Tj
+T*
+(  * Focus states are visible) Tj
+T*
+() Tj
+T*
+(- Testing:) Tj
+T*
+(  * Provide 2 to 3 unit tests \(for example: store upsert, filter logic, or optimistic) Tj
+T*
+(flow\)) Tj
+T*
+() Tj
+T*
+(- Docs:) Tj
+T*
+(  * README.md with run instructions) Tj
+T*
+(  * NOTES.md explaining state choice, batching, trade-offs) Tj
+T*
+(  * PERF.md with brief notes on responsiveness and next steps) Tj
+T*
+() Tj
+T*
+(Submission) Tj
+T*
+(----------) Tj
+T*
+(Choose ONE of the following:) Tj
+T*
+() Tj
+T*
+(A\) Git repository link \(public or invite the reviewer\)) Tj
+T*
+(   - Recommended if you want us to review commit history) Tj
+T*
+(   - Ensure the project runs with: "npm run sim", "npm run dev", "npm test") Tj
+T*
+() Tj
+T*
+(B\) ZIP archive of the project root) Tj
+T*
+(   - Name the file like: YOURNAME-FrontEnd-Assessment.zip) Tj
+T*
+(   - Include all source files and docs \(README.md, NOTES.md, PERF.md\)) Tj
+T*
+(   - EXCLUDE heavy build folders: node_modules, .next, dist) Tj
+T*
+(   - OPTIONAL: Include the ".git" folder if you want us to see your commit history) Tj
+T*
+(   - The project should run after unzip with: "npm i", "npm run sim", "npm run dev") Tj
+ET
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 4 0 R >>
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 5 0 R >>
+endobj
+8 0 obj
+<< /Producer (ChatGPT) /Title (FrontEnd Assessment Instructions) /CreationDate (D:20250812212406Z) >>
+endobj
+xref
+0 9
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000129 00000 n 
+0000000226 00000 n 
+0000002305 00000 n 
+0000004202 00000 n 
+0000004328 00000 n 
+0000004454 00000 n 
+trailer
+<< /Size 9 /Root 1 0 R /Info 8 0 R >>
+startxref
+4571
+%%EOF

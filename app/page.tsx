@@ -1,0 +1,2 @@
+import Link from 'next/link';
+export default function Home(){return (<div className='space-y-4'><p className='text-sm text-gray-600'>Go to the devices route to view the real-time table.</p><Link href='/devices' className='btn border-gray-300 focus-ring'>Open Devices</Link></div>);}
