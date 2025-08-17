@@ -77,14 +77,6 @@ const DevicesPage = () => {
     });
   }, [inFlight, upsertDevice, setInFlight, startTransition]);
 
-  function handleRowKeyDown(e: React.KeyboardEvent, id: string, status: string) {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      if (!inFlight[id] && status !== "rebooting") {
-        handleReboot(id, status);
-      }
-    }
-  }
 
   return (
     <div className="space-y-3">
@@ -124,6 +116,7 @@ const DevicesPage = () => {
         ) : (
           <TableVirtuoso
             data={list}
+            totalCount={list.length}
             className="!h-[100vh]"
             components={{
               Table: (props) => <table {...props} className="min-w-full divide-y divide-gray-200" />,
@@ -133,18 +126,18 @@ const DevicesPage = () => {
             }}
             fixedHeaderContent={() => (
               <tr>
-                <th className="th">ID</th>
-                <th className="th">Status</th>
-                <th className="th">CPU%</th>
-                <th className="th">RAM%</th>
-                <th className="th">Last seen</th>
-                <th className="th">Action</th>
+                <th scope="col" className="th">ID</th>
+                <th scope="col" className="th">Status</th>
+                <th scope="col" className="th">CPU%</th>
+                <th scope="col" className="th">RAM%</th>
+                <th scope="col" className="th">Last seen</th>
+                <th scope="col" className="th">Action</th>
               </tr>
             )}
             itemContent={(_, device) => (
               <>
                 <td className="px-4 py-2 font-mono">
-                  <Link href={`/devices/${device.id}`} className="underline hover:text-blue-600">
+                  <Link href={`/devices/${device.id}`} className="underline focus-ring">
                     {device.id}
                   </Link>
                 </td>
@@ -170,7 +163,7 @@ const DevicesPage = () => {
                 </td>
                 <td className="px-4 py-2">
                   <button
-                    className="btn border-gray-300"
+                    className="btn border-gray-300 focus-ring"
                     disabled={!!inFlight[device.id] || device.status === "rebooting"}
                     onClick={() => handleReboot(device.id, device.status)}
                   >
