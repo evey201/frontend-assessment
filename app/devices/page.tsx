@@ -1,13 +1,14 @@
 'use client';
 import Link from "next/link";
-import { TableVirtuoso } from "react-virtuoso";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { TableVirtuoso, Virtuoso } from "react-virtuoso";
+import { useEffect, useMemo, useState, useTransition, useRef, useCallback } from "react";
 import { useDeviceStore } from "@/lib/store";
 import { connectWebSocket, disconnectWebSocket, makeBatcher } from "@/lib/ws";
 import { rebootDevice } from "@/app/actions";
 
-export default function DevicesPage() {
+const DevicesPage = () => {
   const devices = useDeviceStore(s => s.devices);
+  // console.log("🚀 ~ DevicesPage ~ devices:", devices)
   const filter = useDeviceStore(s => s.filter);
   const setFilter = useDeviceStore(s => s.setFilter);
   const upsertDevice = useDeviceStore(s => s.upsertDevice);
@@ -15,28 +16,57 @@ export default function DevicesPage() {
   const inFlight = useDeviceStore(s => s.inFlight);
 
   const [isPending, startTransition] = useTransition();
+  const [wsStatus, setWsStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
+  const [debugInfo, setDebugInfo] = useState<string>('');
   const batcher = useMemo(() => makeBatcher(upsertDevice, 50), [upsertDevice]);
+  const tableRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const close = connectWebSocket({ onSeed(devs){ useDeviceStore.getState().setDevices(devs); }, onTelemetry(ev){ batcher(ev); } });
-    return () => { disconnectWebSocket(); close?.(); };
+    console.log('DevicesPage: Setting up WebSocket connection...');
+    setWsStatus('connecting');
+
+    const close = connectWebSocket({
+      onSeed(devs) {
+        setDebugInfo(`Seed received: ${devs?.length} devices`);
+        useDeviceStore.getState().setDevices(devs);
+        setWsStatus('connected');
+      },
+      onTelemetry(ev) {
+        batcher(ev);
+      }
+    });
+
+    return () => {
+      disconnectWebSocket();
+      close?.();
+    };
   }, [batcher]);
+
 
   const [localFilter, setLocalFilter] = useState(filter);
   useEffect(() => setLocalFilter(filter), [filter]);
   useEffect(() => { const t = setTimeout(() => setFilter(localFilter), 150); return () => clearTimeout(t); }, [localFilter, setFilter]);
 
   const list = useMemo(() => {
-    const f = (filter ?? '').toString().trim().toLowerCase();
-    if (!f) return devices;
-    return (devices ?? []).filter(Boolean).filter(d => {
+    // First, ensure we have valid devices
+    const validDevices = (devices ?? []).filter(d =>
+      d && d.id && typeof d.id === 'string' && d.id.trim() !== ''
+    );
+
+    const cleanedFilter = (filter ?? '').toString().trim().toLowerCase();
+    if (!cleanedFilter) return validDevices;
+
+    const filteredDevices = validDevices.filter(d => {
       const id = (d?.id ?? '').toString().toLowerCase();
       const status = (d?.status ?? '').toString().toLowerCase();
-      return id.includes(f) || status.includes(f);
+      return id.includes(cleanedFilter) || status.includes(cleanedFilter);
     });
+
+
+    return filteredDevices;
   }, [devices, filter]);
 
-  async function handleReboot(id: string, prevStatus: string) {
+  const handleReboot = useCallback(async (id: string, prevStatus: string) => {
     if (inFlight[id]) return;
     setInFlight(id, true);
     upsertDevice({ deviceId: id, status: "rebooting", ts: Date.now() });
@@ -45,31 +75,120 @@ export default function DevicesPage() {
       if (!res.ok) { upsertDevice({ deviceId: id, status: prevStatus, ts: Date.now() }); }
       setInFlight(id, false);
     });
+  }, [inFlight, upsertDevice, setInFlight, startTransition]);
+
+  function handleRowKeyDown(e: React.KeyboardEvent, id: string, status: string) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (!inFlight[id] && status !== "rebooting") {
+        handleReboot(id, status);
+      }
+    }
   }
 
   return (
     <div className="space-y-3">
+
+      <a href="#devices-table" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-blue-600 text-white px-4 py-2 rounded-md z-50">
+        Skip to devices table
+      </a>
+
       <div className="flex items-center gap-2">
-        <input aria-label="Filter by ID or status" className="input focus-ring max-w-sm" placeholder="Filter by ID or status..." value={localFilter} onChange={e => setLocalFilter(e.target.value)} />
-        <div className="text-xs text-gray-500">{list.length} rows</div>
-      </div>
-      <div role="region" aria-label="Devices table" className="border rounded-md">
-        <TableVirtuoso
-          data={list}
-          className="max-h-[70vh]"
-          fixedHeaderContent={() => (<tr className="bg-gray-50"><th className="th">ID</th><th className="th">Status</th><th className="th">CPU%</th><th className="th">RAM%</th><th className="th">Last seen</th><th className="th">Action</th></tr>)}
-          itemContent={(_, d) => (
-            <tr tabIndex={0} className="focus-ring">
-              <td className="td font-mono"><Link className="underline focus-ring" href={`/devices/${d.id}`}>{d.id}</Link></td>
-              <td className="td"><span className={ d.status === "online" ? "text-green-600" : d.status === "rebooting" ? "text-amber-600" : d.status === "offline" ? "text-gray-500" : "text-red-600" }>{d.status}</span></td>
-              <td className="td">{d.cpu ?? "-"}</td><td className="td">{d.ram ?? "-"}</td>
-              <td className="td">{d.ts ? new Date(d.ts).toLocaleTimeString() : "-"}</td>
-              <td className="td"><button className="btn border-gray-300 focus-ring" disabled={!!inFlight[d.id] || d.status === "rebooting"} onClick={() => handleReboot(d.id, d.status)}>{inFlight[d.id] ? "Rebooting..." : "Reboot"}</button></td>
-            </tr>
-          )}
-          components={{ Table: (p) => <table {...p} className="table" />, TableRow: (p) => <tr {...p} />, TableBody: (p) => <tbody {...p} />, TableHead: (p) => <thead {...p} /> }}
+        <label htmlFor="device-filter" className="sr-only">Filter devices</label>
+        <input
+          id="device-filter"
+          aria-label="Filter by ID or status"
+          className="input focus-ring max-w-sm"
+          placeholder="Filter by ID or status..."
+          value={localFilter}
+          onChange={e => setLocalFilter(e.target.value)}
         />
+        <div className="text-xs text-gray-500" aria-live="polite">
+          {list.length} device{list.length !== 1 ? 's' : ''} found
+        </div>
+      </div>
+      <div
+        id="devices-table"
+        role="region"
+        aria-label="Devices table"
+        className="border rounded-md"
+        ref={tableRef}
+      >
+        {list.length === 0 ? (
+          <div className="p-8 text-center text-gray-500">
+            <p>No devices to display</p>
+            <p className="text-sm mt-2">
+              {list.length === 0 ? 'No devices loaded from WebSocket' : 'Filter returned no results'}
+            </p>
+          </div>
+        ) : (
+          <TableVirtuoso
+            data={list}
+            className="!h-[100vh]"
+            components={{
+              Table: (props) => <table {...props} className="min-w-full divide-y divide-gray-200" />,
+              TableHead: (props) => <thead {...props} className="bg-gray-50" />,
+              TableRow: (props) => <tr {...props} />,
+              TableBody: (props) => <tbody {...props} className="divide-y divide-gray-200" />,
+            }}
+            fixedHeaderContent={() => (
+              <tr>
+                <th className="th">ID</th>
+                <th className="th">Status</th>
+                <th className="th">CPU%</th>
+                <th className="th">RAM%</th>
+                <th className="th">Last seen</th>
+                <th className="th">Action</th>
+              </tr>
+            )}
+            itemContent={(_, device) => (
+              <>
+                <td className="px-4 py-2 font-mono">
+                  <Link href={`/devices/${device.id}`} className="underline hover:text-blue-600">
+                    {device.id}
+                  </Link>
+                </td>
+                <td className="px-4 py-2">
+                  <span
+                    className={
+                      device.status === "online"
+                        ? "text-green-600"
+                        : device.status === "rebooting"
+                          ? "text-amber-600"
+                          : device.status === "offline"
+                            ? "text-gray-500"
+                            : "text-red-600"
+                    }
+                  >
+                    {device.status}
+                  </span>
+                </td>
+                <td className="px-4 py-2">{device.cpu ?? "-"}</td>
+                <td className="px-4 py-2">{device.ram ?? "-"}</td>
+                <td className="px-4 py-2">
+                  {device.ts ? new Date(device.ts).toLocaleTimeString() : "-"}
+                </td>
+                <td className="px-4 py-2">
+                  <button
+                    className="btn border-gray-300"
+                    disabled={!!inFlight[device.id] || device.status === "rebooting"}
+                    onClick={() => handleReboot(device.id, device.status)}
+                  >
+                    {inFlight[device.id] ? "Rebooting..." : "Reboot"}
+                  </button>
+                </td>
+              </>
+            )}
+          />
+        )}
+      </div>
+
+      {/* Live region for status changes */}
+      <div aria-live="polite" aria-atomic="true" className="sr-only">
+        {list.length} devices loaded
       </div>
     </div>
   );
 }
+
+export default DevicesPage;
