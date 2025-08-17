@@ -162,7 +162,7 @@ const DevicesPage = () => {
   return (
     <div className="space-y-3">
 
-      <a href="#devices-table" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-blue-600 text-white px-4 py-2 rounded-md z-50">
+      <a href="#devices-table" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-blue-600 text-white px-4 py-2 rounded-md z-50" aria-label="Skip to devices table">
         Skip to devices table
       </a>
 
@@ -176,7 +176,7 @@ const DevicesPage = () => {
           value={localFilter}
           onChange={e => setLocalFilter(e.target.value)}
         />
-        <div className="text-xs text-gray-500" aria-live="polite">
+        <div id="filer-help" className="text-xs text-gray-500" aria-live="polite">
           {list.length} device{list.length !== 1 ? 's' : ''} found
         </div>
       </div>
@@ -200,29 +200,49 @@ const DevicesPage = () => {
             totalCount={list.length}
             className="!h-[80vh]"
             components={{
-              Table: (props) => <table {...props} className="min-w-full divide-y divide-gray-200" />,
-              TableHead: (props) => <thead {...props} className="bg-gray-50" />,
-              TableRow: (props) => <tr {...props} />,
-              TableBody: (props) => <tbody {...props} className="divide-y divide-gray-200" />,
+              Table: (props) => <table {...props} 
+              className="min-w-full divide-y divide-gray-200" 
+              role="table" 
+              aria-label="Devices table"
+              />,
+              TableHead: (props) => <thead {...props} className="bg-gray-50" role="rowgroup" />,
+              TableRow: (props) => 
+              <tr 
+                {...props} 
+                role="row"
+                className="focus:outline-none focus:bg-blue-50 dark:focus:bg-blue-900/20 focus:ring-2 focus:ring-blue-500 focus:ring-inset"
+                tabIndex={0}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    console.log('keydown', e.key);
+                    const firstButton = e.currentTarget.querySelector('button, a');
+                    if (firstButton) {
+                      (firstButton as HTMLElement).focus();
+                    }
+                  }
+                }}
+              />,
+              TableBody: (props) => <tbody {...props} className="divide-y divide-gray-200" role="rowgroup" />,
             }}
             fixedHeaderContent={() => (
               <tr>
-                <th scope="col" className="th">ID</th>
-                <th scope="col" className="th">Status</th>
-                <th scope="col" className="th">CPU%</th>
-                <th scope="col" className="th">RAM%</th>
-                <th scope="col" className="th">Last seen</th>
-                <th scope="col" className="th">Action</th>
+                <th scope="col" className="th" role="columnheader">ID</th>
+                <th scope="col" className="th" role="columnheader">Status</th>
+                <th scope="col" className="th" role="columnheader">CPU%</th>
+                <th scope="col" className="th" role="columnheader">RAM%</th>
+                <th scope="col" className="th" role="columnheader">Last seen</th>
+                <th scope="col" className="th" role="columnheader">Action</th>
               </tr>
             )}
             itemContent={(_, device) => (
               <>
-                <td className="px-4 py-2 font-mono">
-                  <Link href={`/devices/${device.id}`} className="underline focus-ring">
+                <td className="px-4 py-2 font-mono" role="cell">
+                  <Link href={`/devices/${device.id}`} className="underline focus-ring hover:text-blue-600">
                     {device.id}
                   </Link>
                 </td>
-                <td className="px-4 py-2">
+                <td className="px-4 py-2" role="cell">
                   <span
                     className={
                       device.status === "online"
@@ -233,18 +253,29 @@ const DevicesPage = () => {
                             ? "text-gray-500"
                             : "text-red-600"
                     }
+                    aria-label={`Device status: ${device.id}`}
                   >
                     {device.status}
                   </span>
                 </td>
-                <td className="px-4 py-2">{device.cpu ?? "-"}</td>
-                <td className="px-4 py-2">{device.ram ?? "-"}</td>
-                <td className="px-4 py-2">
-                  {device.ts ? new Date(device.ts).toLocaleTimeString() : "-"}
+                <td className="px-4 py-2" role="cell">
+                  <span aria-label={`CPU usage: ${device.cpu ?? "-"}`}>
+                    {device.cpu ?? "-"}
+                  </span>
+                  </td>
+                <td className="px-4 py-2" role="cell">
+                  <span aria-label={`RAM usage: ${device.ram ?? "-"}`}>
+                    {device.ram ?? "-"}
+                  </span>
                 </td>
-                <td className="px-4 py-2">
+                <td className="px-4 py-2" role="cell">
+                  <span aria-label={`Last seen: ${device.ts ? new Date(device.ts).toLocaleTimeString() : "-"}`}>
+                    {device.ts ? new Date(device.ts).toLocaleTimeString() : "-"}
+                  </span>
+                </td>
+                <td className="px-4 py-2" role="cell">
                 <button
-                      className="btn border-gray-300 focus-ring"
+                      className="btn border-gray-300 focus-ring hover:bg-gray-50/20 disabled:opacity-50 disabled:cursor-not-allowed"
                       disabled={!!inFlight[device.id] || device.status === "rebooting"}
                       onClick={() => handleReboot(device.id, device.status)}
                       aria-label={`Reboot device ${device.id}`}
@@ -258,8 +289,6 @@ const DevicesPage = () => {
           />
         )}
       </div>
-
-      {/* Live region for status changes */}
       <div aria-live="polite" aria-atomic="true" className="sr-only">
         {list.length} devices loaded
       </div>

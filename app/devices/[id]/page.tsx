@@ -24,7 +24,7 @@ const DeviceDetails = () => {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting');
 
   const devices = useDeviceStore(state => state.devices);
-  console.log("🚀 ~ DeviceDetails ~ devices:", devices)
+
   const initialDevice = useMemo(() => {
     return devices.find(device => device.id === id);
   }, [devices, id]);
@@ -181,13 +181,13 @@ const DeviceDetails = () => {
 
   return (
     <div className="space-y-4">
-      <a href="#device-content" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-blue-600 text-white px-4 py-2 rounded-md z-50">
+      <a href="#device-content" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-blue-600 text-white px-4 py-2 rounded-md z-50" aria-label="Skip to device content">
         Skip to device content
       </a>
       
       <div className="flex md:flex-row justify-between md:justify-start md:items-center gap-4">
         <button 
-          className="btn border-gray-300 focus-ring" 
+          className="btn border-gray-300 focus-ring hover:bg-gray-50/20" 
           onClick={() => router.push('/devices')}
           aria-label="Go back to devices list"
         >
