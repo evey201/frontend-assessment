@@ -18,8 +18,34 @@ const DevicesPage = () => {
   const [isPending, startTransition] = useTransition();
   const [wsStatus, setWsStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
   const [debugInfo, setDebugInfo] = useState<string>('');
-  const batcher = useMemo(() => makeBatcher(upsertDevice, 50), [upsertDevice]);
+  const batcher = useMemo(() => makeBatcher(upsertDevice, 500), [upsertDevice]);
   const tableRef = useRef<HTMLDivElement>(null);
+  const activeIdempotencyKeys = useRef<Record<string, string>>({});
+  const rebootTimeouts = useRef<Record<string, NodeJS.Timeout>>({});
+
+  const getOrCreateIdempotencyKey = useCallback((deviceId: string): string => {
+    if (!activeIdempotencyKeys.current[deviceId]) {
+      activeIdempotencyKeys.current[deviceId] = 
+        globalThis.crypto?.randomUUID?.() || 
+        `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    }
+    return activeIdempotencyKeys.current[deviceId];
+  }, []);
+
+  const clearDeviceRebootState = useCallback((deviceId: string) => {
+    delete activeIdempotencyKeys.current[deviceId];
+    if (rebootTimeouts.current[deviceId]) {
+      clearTimeout(rebootTimeouts.current[deviceId]);
+      delete rebootTimeouts.current[deviceId];
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      Object.values(rebootTimeouts.current).forEach(timeout => clearTimeout(timeout));
+    };
+  }, []);
+
 
   useEffect(() => {
     console.log('DevicesPage: Setting up WebSocket connection...');
@@ -67,15 +93,57 @@ const DevicesPage = () => {
   }, [devices, filter]);
 
   const handleReboot = useCallback(async (id: string, prevStatus: string) => {
+    // console.log("🚀 ~ handleReboot ~ id:", id, prevStatus)
     if (inFlight[id]) return;
+
+    // console.log(`Starting reboot for device ${id}`);
+    const idempotencyKey = getOrCreateIdempotencyKey(id);
+    console.log(`Using idempotency key: ${idempotencyKey.substring(0, 8)}...`);
+
+    // Setting the in-flight state and optimistic update
     setInFlight(id, true);
     upsertDevice({ deviceId: id, status: "rebooting", ts: Date.now() });
+
+    const timeoutDuration = 30000;
+    rebootTimeouts.current[id] = setTimeout(() => {
+      console.log(`Reboot timeout for device ${id}`);
+      setInFlight(id, false);
+      upsertDevice({ deviceId: id, status: prevStatus === "rebooting" ? "rebooting" : prevStatus === "online" ? "online" : "offline", ts: Date.now() });
+    }, timeoutDuration);
+
     startTransition(async () => {
-      const res = await rebootDevice(id);
-      if (!res.ok) { upsertDevice({ deviceId: id, status: prevStatus, ts: Date.now() }); }
+      try {
+        console.log(`Calling rebootDevice for ${id} with key ${idempotencyKey.substring(0, 8)}...`);
+        const res = await rebootDevice(id, idempotencyKey);
+        
+        if (rebootTimeouts.current[id]) {
+          clearTimeout(rebootTimeouts.current[id]);
+          delete rebootTimeouts.current[id];
+        }
+
+        if (res.ok) {
+          console.log(`Reboot successful for device ${id}`, res ? '(deduplicated)' : '');
+          clearDeviceRebootState(id);
+        } else {
+          console.log(`Reboot failed for device ${id}:`, res.reason);
+          upsertDevice({ deviceId: id, status: prevStatus === "rebooting" ? "rebooting" : prevStatus === "online" ? "online" : "offline", ts: Date.now() });
+          
+          if (res.reason === 'not_found' || res.reason === 'invalid_id') {
+            clearDeviceRebootState(id);
+          }
+        }
+      } catch (error) {
+        console.error(`Reboot error for device ${id}:`, error);
+        upsertDevice({ deviceId: id, status: prevStatus === "rebooting" ? "rebooting" : prevStatus === "online" ? "online" : "offline", ts: Date.now() });
+        
+        if (rebootTimeouts.current[id]) {
+          clearTimeout(rebootTimeouts.current[id]);
+          delete rebootTimeouts.current[id];
+        }
+      }
       setInFlight(id, false);
     });
-  }, [inFlight, upsertDevice, setInFlight, startTransition]);
+  }, [inFlight, upsertDevice, setInFlight, startTransition, getOrCreateIdempotencyKey, clearDeviceRebootState]);
 
 
   return (
@@ -162,13 +230,15 @@ const DevicesPage = () => {
                   {device.ts ? new Date(device.ts).toLocaleTimeString() : "-"}
                 </td>
                 <td className="px-4 py-2">
-                  <button
-                    className="btn border-gray-300 focus-ring"
-                    disabled={!!inFlight[device.id] || device.status === "rebooting"}
-                    onClick={() => handleReboot(device.id, device.status)}
-                  >
-                    {inFlight[device.id] ? "Rebooting..." : "Reboot"}
-                  </button>
+                <button
+                      className="btn border-gray-300 focus-ring"
+                      disabled={!!inFlight[device.id] || device.status === "rebooting"}
+                      onClick={() => handleReboot(device.id, device.status)}
+                      aria-label={`Reboot device ${device.id}`}
+                      aria-describedby={`reboot-status-${device.id}`}
+                    >
+                      {inFlight[device.id] ? "Rebooting..." : "Reboot"}
+                    </button>
                 </td>
               </>
             )}
