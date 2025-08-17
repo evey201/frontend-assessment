@@ -14,6 +14,7 @@ type Telemetry = {
   metrics?: { cpu?: number; ram?: number };
   ts?: number;
   seq?: number;
+  lastSeq?: number;
 };
 type State = {
   devices: Device[];
